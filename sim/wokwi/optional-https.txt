@@ -1,0 +1,92 @@
+可选本地 HTTPS 工具（不属于当前固件运行验收）
+
+用户已明确连接后端不是本次必要条件；本文件仅保留后续可用材料。
+当前不启动后端、网关或公网隧道，也不以此作为 Wokwi flow 前置条件。
+
+用途
+  本目录用于无设备阶段的仿真。GPIO、ILI9341 显示模型与真实 Passport 板卡不是
+  同一硬件；BLE 输入为合成数据。仿真中的 UI、状态或网络结果不能代替真实
+  LCD、按键、电池、射频、Wi-Fi/BLE 共存与长期运行验收。
+
+  tools/wokwi_backend.py/.mjs 直接导入指定 personal-tools 源码中的真实
+  bluetooth-explorer handler.ts / validation.ts / repository.ts。
+  不启动 Next.js，不加载 .env，不访问生产数据库，不提供管理路由。
+  该服务独立于 Wokwi CLI Token，不读取、不生成、不保存该 Token。
+
+准备与启动（项目根目录）
+  需要已安装依赖的 personal-tools 源码、Node 24、支持 req -addext 的 OpenSSL。
+  不会自动安装运行时，也不会修改 PATH、系统证书、hosts 或网络配置。
+
+  python tools/wokwi_backend.py --backend <personal-tools源码目录> --port 8443
+
+  macOS 本项目也可用 ./passport run python ...；Windows 用已有 Python。
+  如未自动发现运行时，可添加 --node <node可执行文件> --openssl <openssl可执行文件>。
+  --fixture-dir 默认 build/wokwi-fixture，只允许项目 build 下尚不存在的目录；
+  需要重跑时选择新的 build 子目录，避免覆盖旧的验收证据。
+
+  服务只绑定 127.0.0.1；控制台输出 WOKWI_BACKEND_READY 后才可供客户端访问。
+  它生成有效期 7 天的临时证书，SAN 包含 host.wokwi.internal、localhost、127.0.0.1。
+  本机不安装或全局信任该证书；客户端只使用生成的 CA。
+
+  build/wokwi-fixture/ 内容：
+    server.key                    临时 TLS 私钥
+    server.crt                    临时自签名证书
+    credentials.private.json      六字段 USB 配置，内含该证书
+    isolated.sqlite               独立测试数据库
+    status.json                   不含秘密的启动及验收摘要
+
+  凭据只用于该独立库：SSID=Wokwi-GUEST，密码为空，node_id=Wokwi，
+  Token 为注册临时节点生成的 43 字符 base64url。不要替换成真实设备凭据。
+  POSIX 目录权限 0700、文件 0600；Windows 仍须放在仅当前用户可读的本地目录，
+  chmod 不能证明 Windows ACL。build/ 与 *.private.json 已在 .gitignore 中排除。
+  不将私钥、凭据、数据库或包含这些内容的固件/场景加入提交和交付包。
+
+  真实路由为：
+    GET  /api/tools/bluetooth-explorer/ingest/v1/config
+    POST /api/tools/bluetooth-explorer/ingest/v1/heartbeat
+    POST /api/tools/bluetooth-explorer/ingest/v1/observations
+  observations 是事件批次接口，不存在 /events 别名。请求体上限 8192 字节。
+  真实后端继续校验 Token、节点身份、协议、时间范围、去重及限流。
+  摘要只记录固定路由分类、HTTP 状态及计数，不回显 URL 参数、原始报文、
+  BLE 地址、名称、Token 或密钥。Ctrl+C 停止服务并保留本次本地证据。
+
+程序化验收
+  python tools/wokwi_backend.py --assert-report build/wokwi-fixture/status.json --ready-only
+  python tools/wokwi_backend.py --assert-report build/wokwi-fixture/status.json --wait-seconds 120
+
+  第二条返回 0 要求：服务曾启动、至少一个成功 GET 配置、一条成功心跳、
+  一批 ACK 完整的观测、至少一条 accepted 事件及数据库实际保存记录，
+  且无后端内部错误。拒绝请求另计 rejected_requests，需结合场景判读。
+  status.json 只证明后端看到请求，不能自行证明请求来自 Wokwi；必须与对应
+  仿真运行日志关联。device_tests 始终 NOT_RUN。
+
+  本工具自身的主机 HTTPS 测试：
+  python tools/test_wokwi_backend.py --backend <personal-tools源码目录>
+  它启动短生命周期服务，检查 TLS、三个真实接口、去重、非法请求与摘要，
+  结束后清理自己创建的临时目录；不启动模拟器。
+  既有 tools/test_collector_backend.py 的 11 个真实后端联调场景仍独立保留，
+  覆盖范围更广（容量、共享限流、凭据轮换、既有业务数据保护等）。
+  当前说明不声明主机测试、仿真或真机运行已经通过；以本次实际日志为准。
+
+私有网关与 CLI 边界（2026-10-23 官方源码核对）
+  官方 VS Code 扩展内置 Private IoT Gateway；模拟 ESP32 用
+  https://host.wokwi.internal:8443 访问宿主机回环服务，需该运行环境的网关权限。
+  网页 Public Gateway 无法访问本机回环地址。
+  当前官方 CLI simulate.ts 通过云端 Simulation API 上传固件并运行仿真，
+  未实现本地 IoT gateway 桥接参数；本次已安装 v0.29.0 的 --help 也无此选项。
+  因此不能把 CLI Token 或 [net.forward] 当作 CLI 到本地 HTTPS 的可达性证明。
+  本阶段不安装额外网关、不映射公网、不开放局域网监听、不调整防火墙。
+  CLI 可做受支持的仿真步骤；完整本地 HTTPS 联通留给支持私有网关的 VS Code
+  仿真环境实际核验。未连通时保持 NOT RUN/BLOCKED，不改成跳过证书验证。
+
+  官方来源：
+  https://docs.wokwi.com/vscode/project-config#iot-gateway-esp32-wifi
+  https://docs.wokwi.com/guides/esp32-wifi#connecting-to-your-local-machine
+  https://raw.githubusercontent.com/wokwi/wokwi-cli/main/packages/cli/src/commands/simulate.ts
+
+配置窗口与安全边界
+  普通固件仍须先按设备键开放 120 秒配置窗口，再通过 USB 配置入口发送。
+  RECEIVED_RAM_ONLY 只表示收到 RAM 配置，不证明 Wi-Fi、TLS 或后端认证成功。
+  仿真固件如采用编译期合成配置，须明确标注仿真专用，不能据此验收真实 USB。
+  Wokwi CLI 会上传所选固件/ELF 到仿真服务；仅使用合成凭据及临时 CA，
+  不能把真实节点 Token、Wi-Fi 密码、私钥或生产数据嵌入上传的材料。

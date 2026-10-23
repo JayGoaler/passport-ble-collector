@@ -1,0 +1,130 @@
+AI Passport：GitHub 上传范围与 Windows 交接评估
+评估日期：2026-10-04
+本文记录任务书编制阶段的检查快照；实际提交、远端与推送状态以 Git 核验结果为准。
+
+一、结论
+
+推荐通过 GitHub 交接 firmware 仓库的源码、版本配置、技能和交接任务书。
+不上传整个 Mac 工作区，不把本机工具链、缓存、日志或生成固件当作源码。
+Windows 拉取后原生安装工具链；执行同目录的 windows-native-handoff.txt。
+编制时 GitHub 仓库地址和可见性尚未指定，当时仅准备文件和评估，未提交或推送。
+交接初期建议选择用户控制的私有仓库；私有仓库仍不能接收设备秘密或凭据。
+如果要公开，先补完下述二进制素材与历史元数据复核。
+
+二、本次检查的事实与边界
+
+1. 外层 passport/ 不是 Git 仓库，firmware/ 是独立 Git 仓库。
+2. 修改前分支 main，工作区干净；提交：
+   0b9e4c81ee4421c0bac39ca3561d65a8285acd4a。
+   当前远端为 https://gitee.com/FoloToy/ai-passport.git，尚无 GitHub 交接远端。
+3. 修改前已跟踪 274 个文件，总内容 12,099,902 字节，约 11.54 MiB；
+   文本 263 个、二进制图片 11 个。这是文件内容总量，不是实际 clone 下载量。
+4. 本机目录占用约：.toolchains 3.5G、.cache 207M、logs 600K；
+   firmware/.git 30M、build 30M、managed_components 183M。
+   du 的本机占用不是 Windows 安装预算，不据此承诺 Windows 需要相同空间。
+5. 检查了当前已跟踪文本，以及 git rev-list --objects --all 可达的历史：
+   2,807 个对象、1,600 个 blob，其中 1,551 个文本 blob、49 个二进制 blob；
+   blob 内容总计 60,237,231 字节，文本作 UTF-8 模式扫描，二进制仅计数。
+6. 检查模式包括 GitHub token、AWS access key、私钥标记、常见 OpenAI/Google
+   key 格式、字符串形式的密码/API key/Wi-Fi 凭据赋值和未脱敏设备二维码链接。
+   当前文本和历史文本均未命中这些模式。没有打印或复制疑似凭据值。
+
+这不是“绝对无秘密”的认证。其他格式、编码/拼接值、图片二维码、二进制
+秘密、Git 作者姓名/邮件等元数据不被上述扫描完整覆盖。远端未拉取分支、
+不可达对象和 reflog 也不在本次可达历史范围内。上传前需复核实际分支和差异。
+
+三、适合交接的内容
+
+以下路径相对于 firmware 仓库根目录，可随对应源码分支交接：
+- main/、components/：应用与 BSP 源码。
+- tests/、tools/：已有主机测试、仓库检查、构建校验、技能安装与调试归档工具。
+- skills/：五个 Passport 核心技能的维护源及其必要参考，不复制本机生成链接。
+- docs/ 的文本：硬件、工程、开发、贡献文档及本次两份中文交接文件。
+- AGENTS.md、AGENTS.zh_CN.md、CLAUDE.md、CLAUDE.zh_CN.md：项目约定。
+- CMakeLists.txt、sdkconfig.defaults、partitions.csv、dependencies.lock：版本配置。
+- .gitignore、.clangd、LICENSE：忽略规则、项目编辑设置和许可证。
+- .github/：现有 CI、模板和社区文件；启用 Actions 前阅读第四节的实际行为。
+
+LICENSE 标明 MIT，交接软件及文档时保留原版权声明和许可文本。
+素材或第三方内容另有权利问题时，不能仅因仓库有 MIT 文件就认定全部授权。
+本次新增交接说明使用中文 .txt，便于保留仓库既有 Markdown 中英文门禁；
+两份文档入口已登记到 docs/README.md 和 docs/README.zh_CN.md。
+
+图片须补充人工复核：
+- assets/images/：home.jpg、logo.png、两张 wordmark、readme-hardware-specs.png。
+- docs/brand/：产品展示图以及 ai-passport-front-eva-00/01/02.png 等图片。
+当前资源说明记录了部分来源，但本次没有进行图像二维码检查或独立授权审查。
+历史还包含其他二进制版本。准备公开时核对设备二维码、个人信息、第三方
+图案/标识授权和素材声明；发现问题时不能只删当前文件而忽略将要上传的历史。
+本任务不删除素材、改许可证或重写历史。
+
+四、GitHub workflow 的实际影响
+
+- static-checks.yml：PR、main push、手动触发时运行静态与主机测试。
+- firmware-checks.yml：PR、main push、手动触发；docs/、skills/、Markdown
+  改动通常被 paths-ignore 排除。成功时上传合并 BIN，保留期 7 天。
+- build-firmware.yml：任何 tag push 或手动触发会构建并上传合并 BIN；
+  tag push 还会创建 GitHub Release。源码交接不要顺手推全部 tags。
+- sync-main.yml：每天定时/手动运行，在 GitHub fork 中同步上游到 main，
+  使用自动生成的 GITHUB_TOKEN 并有写权限。普通非 fork 仓库的该 job 不运行。
+
+交接分支 push 不等于上述 CI 已运行。记录实际 workflow、分支、提交、
+完成状态和结果链接；不要为触发构建而创建发布 tag。
+调试归档 ELF/MAP 当前不由这些 workflow 上传。需要跨机器分析旧固件时，
+另行授权安全传递匹配归档，不能只拿 Release 的 BIN 就声称具备匹配符号。
+
+五、不应纳入源码交接
+
+外层工作区：
+- .toolchains/、.cache/：OS/架构专用安装、虚拟环境、下载缓存。
+- logs/、环境验收.md：含本机路径/环境信息的本地验收证据，不整份原样上传。
+- .agents/skills/：本机安装副本或链接；仓库 skills/ 是维护源。
+- passport、tools/cc-macos、tools/host_snapshot.py：Mac 专用入口/适配/快照。
+  可按明确需求另行整理，但 Windows 环境不依赖它们；本次不搬入固件仓库。
+- 外层 AGENTS.md/README.md：本机工作区说明；仓库已有独立规范和新任务书。
+
+仓库内：
+- build/、managed_components/、sdkconfig、sdkconfig.old、.vscode/、.idea/。
+- .agents/skills/ 下生成的五个核心技能链接。
+  以上已有 .gitignore 规则，正常不属于 git ls-files；不要使用 git add -f。
+- 固件 BIN、ELF、MAP、Flash/NVS 转储、未脱敏串口日志、设备二维码、Wi-Fi
+  口令、密钥、API token、代理凭据、个人照片/录音和本机安装配置。
+  Windows 日志与工具放在仓库外，不能误放到未被忽略的仓库 logs/ 目录。
+
+固件和符号确需跨机传递时，先确认内容与访问权限、保留匹配关系，使用另外
+批准的 Artifact/Release 或受控传输；不是默认 Git commit 内容。私有仓库也
+不能自动视为所有构建产物已经脱敏。不要打包复制 .git 目录到附件；正常 Git
+push 会传送所推送分支所需历史，历史扫描边界仍需遵守。
+
+六、上传操作流程（编制时未执行）
+
+用户提供 GitHub 仓库 URL、可见性与允许推送的分支后：
+1. 复核 git status、git diff、未跟踪文件及将要上传的分支历史。
+2. 保留 LICENSE、当前 Gitee origin 和全部用户改动；为 GitHub 另加命名远端，
+   不擅自替换 origin。远端已有内容时先检查，不 force-push。
+3. 按本次文件白名单暂存/提交，不对整个外层目录执行 git add。
+4. 用户明确授权提交/推送后，只推所需交接分支；不 push --mirror、不推全部
+   refs/tags，不改公开状态，不创建 Release。
+5. 保存包含任务书的新提交 SHA、实际仓库 URL、分支和必要 CI 记录。
+
+编制时本机准备分支：feature/windows-native-handoff；当时文件尚未提交。
+正式交接时以实际已提交并推送的分支为准，不把未推送内容告知 Windows 已可拉取。
+
+Windows 示例（将变量换为用户提供且已核实的真实值）：
+
+  $handoffUrl = '用户提供的GitHub仓库URL'
+  $handoffBranch = '已推送的交接分支'
+  git clone --depth 1 --branch $handoffBranch $handoffUrl D:\ai-passport\firmware
+  if ($LASTEXITCODE -ne 0) { throw '拉取失败，停止环境配置' }
+  Set-Location D:\ai-passport\firmware
+  git status --short --branch
+  git rev-parse HEAD
+  Get-Content -Encoding UTF8 docs/development/engineering/windows-native-handoff.txt
+
+depth 1 用于首次交接节约下载与存储；以后开发需更早历史/其他分支时再按需
+fetch。浅克隆只减少 Windows 下载，不删除 GitHub 中已上传的历史。
+所有安装和调试按任务书执行，不能把 clone 成功当作开发环境已准备好。
+
+参考：
+GitHub 仓库复制： https://docs.github.com/en/repositories/creating-and-managing-repositories/duplicating-a-repository
+MIT 许可说明： https://choosealicense.com/licenses/mit/

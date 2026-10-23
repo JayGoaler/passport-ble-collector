@@ -1,0 +1,114 @@
+Passport BLE 采集器：USB 临时接入与操作
+日期：2026-10-23（Asia/Shanghai）
+
+一、接入前准备
+
+本版本仅使用 RAM 临时凭据。重启后须重新配置，待确认观测队列也会丢失。
+尚未实施加密持久化；不得把配置收到或重启前可用记为安全存储通过。
+工具不保存配置、原始串口内容或日志。Python 无法保证所有字符串内存副本立即
+清零；使用可信的本机交互终端，避免终端录制、调试器和屏幕分享暴露输入。
+
+需要：
+- 已经完成另行授权刷机的 Passport、本机数据 USB 线、实际端口。
+- 设备可连的 Wi-Fi、可用 DNS 和 UTC 校时服务。
+- 可由设备访问的 https://主机[:端口]，不含路径或尾部斜线。
+- 与基址主机名/IP 匹配的证书 SAN、正确有效期和可信 CA PEM（最多 4096 UTF-8 字节）。
+- 网页中独立注册的 ai_passport 节点及专属 Token。
+
+不能将 Mac 的 127.0.0.1 或已有 HTTP 页面地址当设备 HTTPS 地址。TLS 不会自动
+降级为 HTTP，也没有忽略证书验证选项。笔记本换网络后重新检查服务可达性。
+节点 ID 使用 1–80 个字母、数字、下划线或横线；Token 为服务端生成的 43 字符
+base64url 文本。工具箱网页登录密码、Cookie、Mac 节点 Token 都不用于此处。
+
+二、三键与配置窗口
+
+主界面有“蓝牙采集”“设备列表”“运行诊断”三个页面，上/下切换。
+设备列表中短按确认选择下一设备；长按确认打开操作菜单。
+菜单上/下选择，短按确认执行，长按确认返回状态页。
+
+选择“USB 配置”开启 120 秒窗口。窗口外输入不会写入配置；成功接收后自动关闭。
+配置期间停止产生新的正式扫描观测。若输入时间超过窗口，重新按键开启再发送。
+“暂停 / 恢复”为独立本地开关；本地恢复不能绕过服务端 scan_enabled=false。
+“重新连接”为显式恢复操作，具体诊断以设备状态和稳定错误码为准。
+“清除配置”需第二次确认，只清本应用的 RAM 凭据/运行状态；不擦 NVS 或整片 Flash。
+
+三、推荐方式：macOS 与 Windows 均使用隐藏输入
+
+先激活 ESP-IDF 5.5.3 对应的 Python 环境，检查依赖：
+
+  python -c "import serial; print(serial.__version__)"
+
+Mac 项目专用入口可执行：
+
+  ./passport run python tools/configure_collector.py --port /dev/cu.usbmodem实际端口 --ca-file /实际目录/collector-ca.pem
+
+Windows 在已激活的 ESP-IDF PowerShell 中执行：
+
+  python tools/configure_collector.py --port COM实际编号 --ca-file 'D:\private\collector-ca.pem'
+
+命令里的端口/路径要替换为实值；CA 只能放公开可信证书，不能包含私钥。
+SSID、密码、HTTPS 基址、节点 ID、Token 均使用隐藏输入。工具拒绝管道输入和
+无法隐藏输入的终端，不接受 --token、--password 等秘密参数。应先准备输入信息，
+在设备开启窗口后运行；超时重开窗口重试。工具不会自动重发配置。
+
+串口配置为 115200，打开前预置 DTR/RTS 为 false，避免工具主动发送复位信号。
+操作系统、驱动和真实设备是否仍发生复位须实测。关闭 IDE monitor、WebSerial 等
+端口占用者；脚本不会扫描或打开猜测的其他端口。
+
+四、macOS/Linux 可选：受保护 JSON 文件
+
+不需要文件方式时优先使用隐藏输入，尤其 Windows。Windows 文件 ACL 未由本工具
+实现可靠验证，所以 --config-file 会拒绝运行；不能用 st_mode 冒充 ACL 验证。
+
+macOS 在仓库外准备当前用户拥有的普通文件，权限先设 0600，再用本机编辑器填入
+内容。文件不得是符号链接，不得放云同步目录或加入 Git。示例仅创建空秘密副本：
+
+  (umask 077; cp docs/collector/collector-config.example.json /private/tmp/collector.private.json)
+  chmod 600 /private/tmp/collector.private.json
+
+填好后在配置窗口内运行：
+
+  ./passport run python tools/configure_collector.py --port /dev/cu.usbmodem实际端口 --config-file /private/tmp/collector.private.json
+
+JSON 必须恰好含 ssid、password、base_url、node_id、token、ca 六个字符串字段，
+无额外字段和重复键。CA 在 JSON 内用 \n 表示换行；发送总长最多 8192 字节（含末尾
+换行）。模板空密码/Token/CA 不会被当成可用接入信息，须用实际可信信息填写。
+密码允许为空以表示开放 Wi-Fi；其他字段不能为空。最长 UTF-8 字节数依次为：
+SSID 32、密码 64、基址 256、节点 ID 80、Token 恰好 43、CA 4096。
+
+使用结束按本机秘密文件管理习惯处理原文件；本工具不会擅自删除用户文件。
+忽略规则 *.private.json 只是减少误提交，不等于加密存储或访问控制。
+
+五、判定配置结果
+
+脚本退出码 0 仅表示收到设备：
+
+  RECEIVED_RAM_ONLY
+
+这表示凭据已被 USB 层接收进 RAM 队列；不是 Wi-Fi 已连、时间已同步、TLS/Token
+认证成功。观察设备的网络 IP、时间、后端状态、扫描状态和已应用版本，随后按
+device-acceptance.txt 验证独立 Passport 节点心跳、真实广播和网页数据。
+设备后续的 WIFI_CONNECTING 或 AUTH_CONFIG_APPLIED 也是阶段状态，不能替代
+完整实机验收。工具为避免秘密泄漏不转发原始串口日志或任意未知状态正文。
+
+常见配置错误：
+- CONFIG_LOCKED：尚未按键开启窗口或 120 秒已到，重新开启再试。
+- INPUT_SIZE：长度超出设备行缓冲或为空，按字节限制核对。
+- INVALID_FIELDS：字段协议不匹配；先用配套脚本验证，不手工发送秘密到 monitor。
+- BUSY：上一份配置未被消费，稍后再次开启窗口。
+- 超时/USB 失败：只报告安全摘要，核对端口占用及设备状态后手动重试。
+
+联网之后的诊断分层处理：先 Wi-Fi/IP，再 DNS/UTC，再 CA/主机名/有效期，最后
+节点和 Token。401 不能区分轮换、撤销、过期或禁用，只能检查独立节点管理状态。
+不得通过猜别的 node_id、复用 Mac Token、跳过 TLS 或反复清空 NVS 解决错误。
+
+六、持久化迁移与回退
+
+当前没有凭据持久化格式或自动导入迁移，重启重新走 USB 临时配置。
+未来启用加密持久化前，应先只读核对芯片安全状态、确定分区与恢复方案，并对
+Flash Encryption/eFuse 的具体不可逆影响另行取得授权；本交付未执行这些操作。
+清除或读取失败不得回落到明文 NVS。D11 在当前版本必须保持 NOT RUN / 未实施。
+
+回退应使用来源、布局和哈希均已确认的基线构建，另行授权后再决定分段或整镜像
+写入；不能默认全片擦除、覆盖现有 NVS 或清理工具箱账本/历史。保留匹配 ELF/MAP
+用于解释当前设备崩溃，不能用回退后重新构建的符号解码旧固件。

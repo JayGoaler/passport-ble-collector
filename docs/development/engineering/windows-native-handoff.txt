@@ -1,0 +1,302 @@
+AI Passport：Windows 原生开发与调试环境交接任务书
+编制日期：2026-10-04
+适用对象：拉取本仓库后执行环境准备的开发者或 AI 助手。
+
+一、目标与完成标准
+
+Passport 通常随 Windows 笔记本携带。笔记本须能独立编译、校验固件、
+保留匹配调试符号，并在获得设备操作授权后烧录、采集串口日志和分析崩溃。
+日常开发与调试不依赖 Mac 在线；不安装 WSL、Docker、Linux 虚拟机。
+
+先盘点，再配置，再验收。优先复用现有软件，只补齐被证据确认缺少的工具。
+环境准备不自动授权刷机、串口打开/复位、擦除、提交、推送或发布。
+管理员驱动安装、系统配置更改等超出项目目录的操作，按实际权限要求办理。
+用户已授权的普通配置不重复确认；需要确认时说明具体目标和原因。
+
+完成标准分层记录：
+1. 环境：ESP-IDF v5.5.3 可被稳定激活，实际工具路径可追溯。
+2. 构建：本机原生构建、合并镜像校验和调试归档验证均成功。
+3. 调试准备：可识别设备端口，匹配 ELF 可用，串口和地址解码命令就绪。
+4. 实机：仅在另外授权后验证串口日志、烧录和相关功能。
+5. 完整门禁：原生 Windows 未执行的主机 C 测试、workflow 检查单独列出；
+   交付前由相同源码/配置的 Mac 或 GitHub Linux runner 运行仓库完整检查。
+   该项不能用原生编译通过代替，但不要求日常调试时连接 Mac。
+
+二、先读这些文件
+
+本文件的相对路径基于 Git 仓库根目录，不基于 Mac 外层工作区：
+- AGENTS.md
+- docs/development/engineering/environment-setup.zh_CN.md
+- docs/development/engineering/build-and-test.zh_CN.md
+- docs/development/engineering/firmware-layout.zh_CN.md
+- skills/README.zh_CN.md
+- skills/passport-setup/SKILL.zh_CN.md
+- skills/passport-debug/SKILL.zh_CN.md
+- skills/passport-device-test/SKILL.zh_CN.md
+- docs/development/engineering/github-handoff-assessment.txt
+
+遵守当前用户的中文沟通要求。首次修改前说明目标、已读文件、具体修改范围、
+约束和假设；保留已有未提交改动。不要通过删测试、改门禁或关安全检查求通过。
+
+三、交接基线及目录
+
+Mac 编制时核验：
+- 固件源： https://gitee.com/FoloToy/ai-passport.git
+- 交接前基线提交：0b9e4c81ee4421c0bac39ca3561d65a8285acd4a
+- ESP-IDF：v5.5.3；SDK 提交：2c211b236707889e8400c4dc5644dd5c4ee071e0
+- Python：3.11.16；CMake：3.30.2；Ninja：1.12.1；RISC-V GCC：14.2.0
+- ESP32-C3、8 MB Flash、无 PSRAM、USB Serial/JTAG 控制台。
+
+上面的 Git 提交是准备任务书前的参考基线。Windows 应记录实际拉到的交接
+分支、提交和工作区 diff；包含本文件的新提交才是此次交接版本。
+ESP-IDF 必须严格为 v5.5.3；其余工具优先使用该 SDK 的官方配套版本。
+Python 建议 3.11，不要求为了匹配 Mac 补丁号再安装一套重复 Python。
+Windows ARM64 机器先核实所选官方工具包及兼容性，不默认已通过验证。
+
+推荐布局，驱动器按实际剩余空间选择：
+  D:\ai-passport\firmware\       GitHub checkout，含本任务书
+  D:\ai-passport\.toolchains\    Windows SDK 和工具；位于 Git 仓库之外
+  D:\ai-passport\.cache\         本项目缓存，实际路径写入本机报告
+  D:\ai-passport\logs\windows\  本机验收与串口日志，不入 Git
+
+使用短英文、本机目录，避免空格、括号、中文和自动同步目录。
+官方限制 IDF/工具安装路径不超过 90 字符；项目路径也不能含空格。
+外层 Mac 工作区不是 Git 仓库，不能指望 GitHub clone 带回其 passport 启动器、
+.toolchains、.cache 或 logs。本任务书只依赖 firmware 内的已提交内容。
+
+四、阶段 A：只读盘点
+
+先确认当前目录确实含 CMakeLists.txt、sdkconfig.defaults 和 tools/。
+在普通 PowerShell 执行以下命令，缺少的命令记录为缺少，不能当作安装损坏：
+
+  Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture
+  Get-CimInstance Win32_ComputerSystem | Select-Object TotalPhysicalMemory
+  Get-PSDrive -PSProvider FileSystem | Select-Object Name, Used, Free
+  Get-Command git,python,cmake,ninja,idf.py -ErrorAction SilentlyContinue |
+      Select-Object Name, Source
+  git status --short --branch
+  git rev-parse HEAD
+
+只记录相关工具版本、路径、可用内存/磁盘及相关配置文件的哈希；不导出全部
+环境变量、凭据配置正文、设备二维码或完整用户配置。
+检查已有 ESP-IDF 的专用快捷方式。普通 PowerShell 找不到 idf.py 不代表必须
+重装；先在对应环境终端执行 idf.py --version。
+
+盘点后给出实际路径、安装选择、预计下载项和可用空间。空间不足时先报告，
+不得自动卸载旧版本、清空共用缓存或降低任务目标。
+
+五、阶段 B：准备最小原生工具链
+
+使用乐鑫官方 ESP-IDF Tools Installer，明确选择 v5.5.3 和 ESP32-C3。
+网络有限优先在线安装，减少完整离线包与解压后的双份占用；无网络时再使用
+对应官方离线包。预先确认安装器确实提供要求的版本，不静默改用新版。
+
+必需：Git、官方配套 Python/虚拟环境、ESP32-C3 RISC-V 编译器、GDB、
+addr2line、CMake、Ninja、esptool、IDF Monitor，以及设备实际需要的 USB 驱动。
+编辑器可沿用当前软件；VS Code/ESP-IDF 扩展是可选项，不重复下载另一套 SDK。
+JTAG 断点调试为可选进阶项；OpenOCD 命令存在不等于驱动和设备连接已通过。
+
+优先把 SDK 和工具放在所选 .toolchains 目录；通过安装器支持的选项配置工具
+位置。若安装器使用用户目录下的缓存/工具，记录真实路径和影响，不声称全量
+隔离成功，也不要在未确认支持的情况下硬改安装器配置。
+不要复制 Mac 的 Python 虚拟环境、ARM64 工具或 build/ 到 Windows。
+不改系统/用户默认 PATH、默认 Python、PowerShell profile、全局 Git、代理、
+证书或包管理器配置。镜像变量仅作用于当前项目终端；保留现有 TLS 校验。
+
+使用安装器生成的 ESP-IDF PowerShell/Command Prompt 快捷方式激活；本任务书
+后续示例采用 PowerShell 语法。不能把 source/export 写成 PowerShell 命令。
+在激活后的终端检查：
+
+  idf.py --version
+  python --version
+  python -c "import sys; print(sys.executable)"
+  cmake --version
+  ninja --version
+  riscv32-esp-elf-gcc --version
+  riscv32-esp-elf-gdb --version
+  riscv32-esp-elf-addr2line --version
+  python -m esptool version
+  Get-Command idf.py,python,cmake,ninja,riscv32-esp-elf-gcc |
+      Select-Object Name, Source
+  Get-Item Env:IDF_PATH,Env:IDF_TOOLS_PATH -ErrorAction SilentlyContinue
+
+idf.py 输出不严格为 ESP-IDF v5.5.3 时停止生成项目配置。
+关闭该终端，在新的普通 PowerShell 中复核原有工具路径与配置摘要；激活前后
+差异须符合已说明的安装影响。不要凭安装完成提示判定环境验收通过。
+
+六、阶段 C：安装并验证项目技能
+
+开发前必须让当前 AI 环境发现并读取五个 passport-* 技能，来源为本仓库 skills/。
+在仓库根目录先运行：
+
+  python tools/install_passport_skills.py --check
+
+缺少时优先使用该助手 --install，随后再 --check。助手创建的是相对目录符号
+链接。若 Windows 的符号链接权限限制导致失败，不自动开启开发者模式或提权；
+由 AI 按其实际发现机制选择仓库级安装方式，例如将这五个目录复制到对应的
+.agents/skills/。先检查冲突，保留现有目录，核对源文件哈希并实际读取各 SKILL.md。
+复制方案不能通过此助手的链接检查，应记录真实验证方式，不伪报 --check 成功。
+仅直接阅读源文件可临时辅助工作，不能当作已安装/已发现的证明。
+
+七、阶段 D：原生构建与固件校验
+
+以下是基于当前 SDK 和仓库工具整理的 Windows 待执行步骤，Mac 没有执行这些
+PowerShell 命令，也没有证明 Windows 验收通过。任何命令失败都立即停在该步，
+记录退出码和脱敏错误，保留前面成功产物；不把历史产物当作本轮新产物。
+
+先在仓库根目录执行仓库检查和能在本机运行的 Python 测试：
+
+  python tools/check_repo.py
+  python tests/test_deep_sleep_contract.py
+  python tests/test_check_repo.py
+  python tests/test_verify_firmware.py
+  python tests/test_archive_firmware.py
+  python tests/test_install_passport_skills.py
+
+逐项记录退出码、测试数量、失败和跳过项目。遇到 Windows 平台不兼容，报告
+具体原因；不修改上游测试来隐藏失败。部分 Python 测试通过不代表所有主机
+测试通过。原生 C 编译器并非 ESP32-C3 交叉编译器，不用后者运行主机测试。
+
+推荐隔离构建，不执行根目录 set-target，不覆盖已有 sdkconfig。
+在已激活的 ESP-IDF PowerShell、仓库根目录，逐段执行：
+
+  $repo = (Get-Location).Path
+  $build = Join-Path $repo 'build\windows-native'
+  $config = Join-Path $build 'sdkconfig'
+  $defaults = Join-Path $repo 'sdkconfig.defaults'
+  $env:IDF_TARGET = 'esp32c3'
+  $env:IDF_TOOLCHAIN = 'gcc'
+  New-Item -ItemType Directory -Force -Path $build | Out-Null
+  idf.py -B $build -D "SDKCONFIG=$config" -D "SDKCONFIG_DEFAULTS=$defaults" reconfigure
+  if ($LASTEXITCODE -ne 0) { throw '配置失败，停止构建' }
+
+  cmake --build $build --parallel 2
+  if ($LASTEXITCODE -ne 0) { throw '构建失败，停止后续步骤' }
+
+  idf.py -B $build -D "SDKCONFIG=$config" -D "SDKCONFIG_DEFAULTS=$defaults" merge-bin -o "$build/FoloToy-AI-Passport-full.bin"
+  if ($LASTEXITCODE -ne 0) { throw '合并失败，停止校验' }
+
+  python tools/verify_firmware.py $build
+  if ($LASTEXITCODE -ne 0) { throw '固件校验失败，不能交付或烧录' }
+  python tools/archive_firmware.py create $build
+  if ($LASTEXITCODE -ne 0) { throw '调试归档失败，保留构建文件并报告' }
+  Get-FileHash -Algorithm SHA256 "$build/FoloToy-AI-Passport-full.bin"
+  Select-String -Path $config -Pattern 'CONFIG_IDF_TARGET|CONFIG_ESPTOOLPY_FLASHSIZE|CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG|CONFIG_SPIRAM'
+  git status --short --branch
+  git diff -- dependencies.lock sdkconfig.defaults partitions.csv
+
+配置应为 ESP32-C3、8 MB Flash、USB Serial/JTAG，且没有启用 PSRAM。
+初次执行前若 build/windows-native 已存在，检查其来源与配置，不删除它求通过；
+不能复用时换用明确的隔离目录并同步后续命令。
+记录 create 输出的归档目录，再执行：
+
+  python tools/archive_firmware.py verify <本轮实际归档目录>
+
+尖括号是占位符，必须替换为实际路径；PowerShell 有空格的参数需加引号。
+保留匹配的完整 BIN、应用 ELF/MAP、manifest.json、bootloader、分区表和 flash_args。
+原生构建的完整镜像在 build/windows-native/ 下；不能假定 build/ 顶层已被更新。
+不同操作系统构建的 BIN 哈希可能不同；逐字节复现不是本任务的默认验收要求。
+
+八、资源使用与启动方式
+
+只保留一套所需 SDK/芯片工具，固定一个可增量使用的构建目录；记录安装前后
+实际占用，不承诺固定安装尺寸。主要构建先使用并行数 2，内存不足时降为 1；
+子构建仍可能有独立进程，不保证整个进程树只使用两个 CPU 核心。
+不同时运行 IDE 自动构建和命令行构建；ccache 可选，不作为前置条件。
+历史归档清理前先盘点，保留当前设备固件匹配的 ELF/MAP；不清空共用缓存。
+
+先使用官方 ESP-IDF 终端快捷方式即可完成启动。如果确需一个项目入口，再
+实现最小的 PowerShell 启动脚本：从脚本位置定位仓库，读取忽略的本机配置，
+检查 SDK 版本，调用已验证的官方激活方式；仅提供版本/构建/校验/调试入口。
+设备写入需明确命令，不在打开终端时自动连接、刷机或擦除。启动入口的新增
+属于 Windows 执行阶段，实施前给出文件范围与验证方案，不引入后台服务。
+
+九、阶段 E：USB 与现场调试
+
+USB 初步检查不打开串口。在设备管理器确认连接/断开对应的实际 COM 口；
+也可使用 Get-CimInstance Win32_SerialPort 记录设备名称和端口。
+本板使用 ESP32-C3 原生 USB Serial/JTAG，不按通用开发板习惯安装 CH340/CP210x。
+只在实际设备 ID 和驱动错误表明缺失时安装对应官方驱动。
+若未枚举，检查供电、数据线和电脑 USB 口；下载模式按本板指南操作，不猜测
+通用 BOOT/RESET 按钮组合。关闭占用端口的 WebSerial/IDE/其他监视器。
+
+以下步骤必须另外获得设备操作授权；先确认设备、端口、已校验镜像以及数据
+影响。这里给出命令不代表执行许可：
+
+  $port = 'COM实际编号'
+  # 有意完整刷新：合并镜像从 0x0 写入，可能重置 NVS 等数据。
+  python -m esptool --chip esp32c3 --port $port --baud 460800 write_flash 0x0 "$build/FoloToy-AI-Passport-full.bin"
+  # 日常开发保留数据：先核对布局兼容和写入范围，再选择分段烧录。
+  idf.py -B $build -D "SDKCONFIG=$config" -p $port flash
+
+两条烧录命令为不同目的的选择，不是连续执行清单。无需备份原有固件，但
+需要保留用户设置/记录时先导出相应数据；不得默认执行 erase-flash。
+
+串口采集同样先取得授权；初次观察限时 60 秒，使用 Ctrl+] 退出：
+
+  idf.py -B $build -D "SDKCONFIG=$config" -p $port monitor
+
+必须使用与设备内固件匹配的 ELF。monitor 可能尝试构建/复位，执行前确认
+其实际选项和影响；需要直接指定历史 ELF 时查阅本环境 idf_monitor 的帮助。
+日志存放在仓库外的 logs/windows，不把未脱敏日志上传 GitHub。
+成功连接、成功写入、成功启动、功能通过分别记录，不相互代替。
+
+崩溃时先对比启动/异常日志 ELF 身份与归档 manifest 的 app_elf_sha256。
+唯一匹配后，用已激活工具链解码实际 PC/可信返回地址：
+
+  riscv32-esp-elf-addr2line -pfiaC -e <匹配的ELF路径> <实际异常地址>
+
+不得用随后重新编译的 ELF 冒充旧固件符号；原始栈数字不全是返回地址。
+JTAG/OpenOCD/GDB 断点调试按官方 ESP32-C3 文档单独验收，报告驱动、连接、
+halt/continue 等实际结果，不把它作为低资源基础调试环境的必需项。
+
+十、完整门禁与 GitHub 交接
+
+当前 tools/validate.sh 依赖 Bash、POSIX 临时目录和主机 C 编译器；
+tools/install-actionlint.sh 自动安装平台只有 Linux/macOS。
+不要在 PowerShell 直接运行它，或把 Git Bash 存在当作完整门禁已兼容。
+不为了准备调试环境强制安装 WSL/MSYS2/MinGW。
+如 Windows 本机已具备兼容环境，可评估原样运行；否则完整门禁由 Mac 或
+GitHub runner 对此次实际交接提交运行，原生缺项记 NOT RUN。
+
+Windows 的日常原生构建、烧录、串口、符号解析仍应独立可用。
+需要交付源码/固件时才核对完整门禁。当前 CI 的 feature 分支 push 不一定
+自动触发检查，文档变更也会被固件 workflow 的 paths-ignore 排除；应检查
+实际运行记录，必要时使用 workflow_dispatch，不能把已上传当作 CI 通过。
+
+十一、Windows 完成报告（保存到仓库外）
+
+日期、Windows 版本/架构、可用空间、所用终端：
+仓库地址、实际分支/提交、未提交修改摘要：
+SDK 版本/提交、各工具版本与路径、技能发现方式：
+安装前后普通终端差异、项目占用、缓存实际位置：
+Environment: PASS / FAIL
+Build: PASS / FAIL / NOT RUN
+Firmware verification: PASS / FAIL / NOT RUN
+Debug archive: PASS / FAIL / NOT RUN（绝对路径、完整 BIN SHA-256）
+Host tests: PASS / FAIL / NOT RUN（Python/C/workflow 分项，失败和跳过数量）
+USB enumeration: PASS / FAIL / NOT RUN（实际 COM 口）
+Debug readiness: PASS / FAIL（工具、匹配符号、命令准备情况）
+Serial capture: PASS / FAIL / NOT RUN
+Flash: PASS / FAIL / NOT RUN
+Device tests: PASS / FAIL / NOT RUN
+Full gate: PASS / FAIL / NOT RUN（平台、提交、真实日志/CI 链接）
+Unverified: 设备功能、JTAG、平台兼容、缺少权限等未完成项
+
+环境安装、编译、校验、串口观察、设备功能各有证据。只有真正运行并满足
+验收条件的项才能标 PASS；其余说明阻塞或待操作，不用 Mac 记录代替 Windows。
+
+十二、Windows 给 AI 的执行提示词
+
+请读取 AGENTS.md 和 docs/development/engineering/windows-native-handoff.txt，
+使用 passport-setup 检查并配置这台 Windows 笔记本的原生 Passport 开发与
+调试环境。先盘点现有工具、磁盘/内存、Git 状态；复用 ESP-IDF v5.5.3，
+仅补齐 ESP32-C3 必需工具。不安装 WSL/Docker/虚拟机，不改全局开发环境。
+先说明文件与安装范围，再配置、构建、校验并保留匹配的 ELF/MAP。
+检查五个项目技能的实际可用性。USB 只枚举，刷机、串口打开/复位和擦除
+分别取得授权。按任务书分项报告真实结果，不将部分测试或 Mac 结果冒充
+Windows 完整验收。不提交或推送；权限/路径/资源不足时报告具体阻塞。
+
+官方参考（核对版本后使用）：
+Windows 安装： https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32c3/get-started/windows-setup.html
+USB Serial/JTAG： https://docs.espressif.com/projects/esp-idf/en/v5.5.3/esp32c3/api-guides/usb-serial-jtag-console.html

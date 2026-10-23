@@ -1,0 +1,9 @@
+menu "Collector simulation"
+    config COLLECTOR_WOKWI
+        bool "Wokwi-only synthetic BLE and simulated board"
+        default n
+        depends on IDF_TARGET_ESP32C3
+        help
+            Simulation only. Replaces BLE radio input and display/button drivers.
+            This firmware must not be flashed onto the Passport hardware.
+endmenu

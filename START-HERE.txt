@@ -1,0 +1,22 @@
+Passport BLE 采集器（待实机验收版）
+
+本目录是独立应用，代码基于 Passport 源码基线 79bdc9a；
+passport-ble-collector 仓库使用独立 Git 历史，不携带原项目的历史提交。
+main/ 为本次采集器；原演示源仍保留用于基线回归，但不会作为应用入口启动。
+
+阅读 docs/collector/README.txt，然后查看：
+- docs/collector/acceptance-20261023.txt：本阶段结果、H01–H12证据和剩余事项。
+- docs/collector/resource-budget.txt：实际容量、内存预算与调整原因。
+- docs/collector/laptop-handoff-20261023.txt：笔记本恢复与环境验证。
+- docs/collector/device-acceptance.txt：尚未执行的 D01–D12。
+- sim/wokwi/README.txt：独立仿真构建、运行命令和替代边界。
+- docs/collector/wokwi-acceptance-20261023.txt：Wokwi 本轮证据。
+- docs/collector/wokwi-handoff-20261023.txt：包含最新仿真代码的新归档与笔记本交接补充。
+
+Mac：./passport test / build / check
+单项源码测试：./passport run python tools/test_collector.py --sanitize
+USB 配置工具：tools/configure_collector.py（只有实机接入另获授权后才使用）。
+
+当前源码请核对 https://github.com/JayGoaler/passport-ble-collector 的 main
+分支和实际提交；本地完整交接 ZIP 是发布前快照。实机仍未刷写或验收。
+凭据仅保留 RAM，重启需重新配置；加密持久化尚未实施。

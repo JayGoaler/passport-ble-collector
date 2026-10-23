@@ -1,0 +1,16 @@
+#!/bin/bash
+# 仅在子进程内复用专用工作区工具链。
+set -euo pipefail
+project="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+workspace="${PASSPORT_WORKSPACE:-$(cd "$project/../.." && pwd)}"
+mode="${1:-help}"
+[[ $# == 0 ]] || shift
+case "$mode" in
+ version) exec "$workspace/passport" version ;;
+ test) args=(./tools/validate.sh --static) ;;
+ build) args=(./tools/validate.sh --firmware) ;;
+ check) args=(./tools/validate.sh) ;;
+ run) args=("$@") ;;
+ *) echo '用法: ./passport version|test|build|check|run <命令>'; exit 2 ;;
+esac
+exec "$workspace/passport" run bash -c 'cd "$1"; export CC="$2/tools/cc-macos"; shift 2; exec "$@"' bash "$project" "$workspace" "${args[@]}"

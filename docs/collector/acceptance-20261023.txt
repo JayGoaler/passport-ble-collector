@@ -1,0 +1,127 @@
+Passport BLE 采集器：无设备阶段验收报告
+日期：2026-10-23；源端 macOS Apple Silicon；设备与目标笔记本未接入。
+本报告记录首次验收时的发布前状态。后续源码提交与远端状态以当前 Git 为准；
+下面的镜像哈希、测试结果和未实机验证事项仍对应当时的交接快照。
+
+一、结论
+
+Build: PASS
+Host tests: PASS（完整基线门禁、采集器源码测试、ASan/UBSan、隔离后端与真实LVGL）
+Device tests: NOT RUN（D01–D12 全部未执行）
+Unverified: 实机启动、BLE/Wi-Fi共存、目标TLS/校时、物理屏幕/按键、运行堆/栈与长稳；
+Windows接手环境；加密凭据持久化未实施，当前仅RAM临时接入。
+
+此版本是“待实机验收版”。本次授权的无设备代码、测试、构建和恢复材料已准备；
+没有提交、推送、刷机、打开设备串口、擦除或烧写eFuse，代码也未传到笔记本。
+
+二、项目、版本与实现
+
+工作区内路径：projects/ble-collector（独立Git仓库），功能分支feature/ble-collector。
+源基线：79bdc9a78d3eb7dae0b66862f1b8113ab0dae10e。
+HEAD仍为基线，所有实现是本次未提交修改/未跟踪文件，无upstream、无新增commit。
+原firmware仍在feature/windows-native-handoff，工作区干净，本次未改写其文件。
+projects/README.md说明多项目管理方式；各项目隔离源码、配置、build、logs和artifacts。
+
+完成模块：
+- collector_core：严格1.0协议、UTC、AD/UTF-8清理、直方图精确中位数、窗口与有界队列、
+  同ID重试、确认后出队、条数/字节/TTL限制及错误退避。
+- collector_scan：NimBLE被动扫描，只入队简化样本，独立扫描epoch与停止/退出确认。
+- collector_network：Wi-Fi RAM配置、SNTP、异步DNS、有界HTTPS、严格CA/主机名校验、
+  独立worker和连接复用。401即使SDK返回transport错误仍停止自动请求。
+- collector_controller：服务配置先执行后报告revision、本地/远程双暂停、心跳优先、
+  共享POST预算、429冷却和两种409容量降级；清除撤销排队旧配置并保留累计丢弃。
+- collector_usb / configure_collector.py：按键开启120秒窗口、隐藏输入、无秘密参数/
+  回显、窗口代际隔离、RAM-only阶段回执；清除只触及本应用运行状态。
+- collector_ui / 字库：独立状态、设备、诊断、菜单四页；静态中文字形覆盖检查、
+  动态未知字形显示[?]；复用BSP而不沿用原硬件演示菜单。
+- package_collector.py / verify_collector_handoff.py：完整未提交源码归档、匹配固件、
+  文件级清单与哈希、跨平台安全路径校验、临时解包恢复验证。
+
+最终策略：16聚合地址、32事件队列、300秒TTL、16样本队列、8KiB请求、4KiB响应，
+每批不超过32条和协议32KiB。聚合/事件store主机sizeof=26392B。
+资源调整原因和各任务预算详见resource-budget.txt；不能承诺全量采集或断网零丢失。
+
+三、实际验证命令与证据
+
+1. ./passport check
+   退出0；静态/workflow检查、上游11个C主机程序及107项Python测试保留并通过。
+   采集器17组核心测试、真实controller源码测试、网络72项边界检查、真实USB源码
+   状态/竞争测试、16项配置工具测试、12项交接归档测试通过。
+   ESP-IDF干净隔离构建、merge-bin、布局验证、BIN/ELF归档一致性通过。
+   真实LVGL通过1233次固定字形/位图检查、四页/菜单状态、三键回调、边界几何和
+   64次长字段翻页；24KiB池峰值14560B，主机预览不是屏幕实拍。
+   证据：logs/full-gate.log、logs/ui-preview/page-0.png至page-3.png。
+
+2. ./passport run python tools/test_collector.py --sanitize --emit-fixtures <临时目录> --now-ms 1792717202000
+   17组、264295次检查通过；真实ESP-IDF cJSON，ASan/UBSan无报告，controller通过。
+   普通模式17组264113次检查通过。测试包含随机中位数对照、4096次AD模糊输入、
+   JSON分配失败、满字段8KiB拆批、64地址公平准入和跨窗口计数边界。
+   证据：logs/collector-host.log。
+
+3. ./passport run python tools/test_collector_network.py --sanitize
+   72项通过：持续响应超限/超时单次关闭、401状态保留、TLS配置/原Host、IPv6、
+   DNS晚到回调、SNTP重配置。ESP/LwIP/HTTP底层是测试替身，不代表设备TLS通过。
+   ./passport run python tools/test_collector_usb.py --sanitize
+   真实USB解析逻辑通过跨窗半行、超长、队列满、清除与parse/queue/reply竞争测试。
+   证据：logs/network-host.log、logs/usb-host.log。
+
+4. ./passport run python tools/test_collector_backend.py --backend <personal-tools仓库>
+   最终C序列化报文进入现有后端真实validation/handler/repository，11场景通过。
+   临时SQLite、临时CA/私钥和本机HTTPS；受信证书成功，不受信和错误主机名失败。
+   后端原有tests/*.test.ts共79项回归通过，含账本和原Mac节点保护场景。
+   测试不加载生产.env，不向生产写入，不替代线上D12核对。
+   证据：logs/backend-final.log（最终C报文）、logs/backend-integration.log（含79项回归）。
+
+5. git diff --check、源代码哈希快照比对、交接清单/恢复校验。
+   源码与最终固件构建输入的哈希快照：logs/final-code-snapshot.json。
+   Git状态/差异与环境：logs/workspace-state.txt、logs/tracked-changes.patch、logs/environment.log。
+   归档工具还扫描明确的Token/私钥模式、非空JSON秘密字段并排除私密配置；
+   此扫描不是通用秘密探测保证。本次未接收或写入真实Wi-Fi/Token/CA配置。
+
+四、H01–H12覆盖对应
+
+H01：核心序列化与实际后端validation；未知字段、nullable缺失和版本拒绝。
+H02：AD截断/字节序、空字段、UUID、UTF-8/控制符与长度边界。
+H03：精确中位数oracle、有效RSSI范围、min/max/count、空窗/单样本和表满。
+H04：UTC、闰年、格式/时间范围；校时倒跳后无新样本心跳仍可发送。
+H05：确认与重复计数、同事件重试；不同boot标识生成不同ID；后端乱序不回退。
+H06：状态分类、transport错误、退避和协议阻断；网络底层替身故障注入。
+H07：实际后端整批拒绝、确认前冻结、413拆批；不假定部分接受。
+H08：条数/字节/TTL、满队列淘汰、在途保护、有限内存与丢弃计数。
+H09：真实controller先执行后revision、同版本不重启、双暂停与恢复完整窗口。
+H10：退避不被新样本取消、POST共用600ms间隔、429至少60秒、心跳优先。
+H11：USB/主机工具错误与无回显测试；静态确认NVS初始化失败直接返回且无erase，
+     Wi-Fi使用WIFI_STORAGE_RAM。真实NVS故障/芯片安全状态不在本轮主机验证范围。
+H12：后端隔离环境的跨节点身份与账本/Mac回归；生产状态未执行验收。
+
+五、最终构建身份
+
+ESP-IDF v5.5.3；Python3.11.16；CMake3.30.2；Ninja1.12.1；RISC-V GCC14.2.0。
+dependencies.lock未变；目标esp32c3，8MB Flash，原NVS/PHY/factory分区布局未变。
+应用BIN：1544400B，factory容量8323072B；完整合并BIN：1609936B。
+DRAM链接器使用203206B，余118090B（不是实机可用heap）。
+主机和编译结果不能证明TLS握手时DMA/连续堆/任务栈足够，D09/D10必须实测。
+
+完整BIN SHA-256：
+e23cab7d0fef9a3c3e618755003038ac8250d1d49c31a1d8bf422eb67a84c5a2
+匹配ELF SHA-256（与app descriptor一致）：
+f8258cbe2ddf2b99e2b04b586dd3ae5210dcc5c0b145ada85a2f71b71ca95cee
+
+权威归档：build/firmware/e23cab7d0fef9a3c3e618755003038ac8250d1d49c31a1d8bf422eb67a84c5a2/
+对应manifest列出BIN、ELF、MAP、bootloader、partition-table及flash_args哈希。
+其他build/dev或早期哈希目录是迭代产物，不作为本次交付镜像。
+未来获授权刷机时，完整合并BIN用于0x0，不能把app单镜像用于0x0；合并写入可能
+覆盖已有设置，应先按分区和写入范围核对。此说明不授权现在刷机或整片擦除。
+
+六、接手与剩余计划
+
+交接载体：artifacts/ble-collector-handoff-20261023.zip；精确ZIP SHA-256见同名.sha256。
+ZIP含source/、firmware/<完整BIN哈希>/、evidence/、manifest.json。
+不含.git、工具链、managed_components和构建缓存；source包含全部本次未提交实现。
+目标先核对ZIP哈希和清单，再恢复到新目录；不要git pull或覆盖已有工作区。
+操作步骤见laptop-handoff-20261023.txt；正式目标环境恢复状态仍为NOT RUN。
+
+后续依次：笔记本恢复/ESP-IDF5.5.3环境核对 → 提供独立节点和可信HTTPS接入条件 →
+另行授权设备操作 → D01–D08基础验收 → D09/D10的2小时及24小时长稳 →
+根据实测修复并重建 → 具备安全存储方案后实施并验收D11 → 上线前后D12核对。
+本机RAM临时凭据仅满足任务书允许的临时研发路径，不冒充加密持久化完成。

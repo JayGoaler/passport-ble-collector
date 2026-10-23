@@ -1,0 +1,154 @@
+Passport BLE 采集器：笔记本接手材料
+更新时间：2026-10-23，Asia/Shanghai
+源设备：macOS Apple Silicon；目标：沿用既有 Windows 原生开发方向，实际环境未验。
+本文件记录发布前交接包形成时的状态。最新源码以
+https://github.com/JayGoaler/passport-ble-collector 的 main 分支及其提交为准；
+归档是独立可恢复的历史快照，不能用下述旧基线 HEAD 代替最新版本。
+
+一、目标、状态与授权
+
+用户要求完成无设备阶段源码、主机测试、固件构建，并在 passport/projects 下
+独立管理项目。原 firmware 基线不承载本次应用改动。
+本交接只准备材料；未声称已传到笔记本、目标环境可用或设备功能通过。
+当前明确不提交、不推送、不刷机。也未执行整片擦除、eFuse 或上线配置变更。
+未来设备操作须得到届时有效授权；本文件中的命令说明不是执行许可。
+
+入口与范围：
+- 本次源项目：passport/projects/ble-collector。
+- 源码基线：79bdc9a78d3eb7dae0b66862f1b8113ab0dae10e。
+- 功能分支：feature/ble-collector。
+- 代码实际版本由未提交工作区和归档 manifest 共同确定，仅 HEAD 不能识别本次实现。
+- 本分支无 upstream，本次改动未在 GitHub 可获取；直接 git pull 无法恢复这些修改。
+- 本地 baseline remote 指向原 passport/firmware；github remote 为
+  https://github.com/JayGoaler/passport.git。缓存引用不代表远端当前状态，未检查远端。
+- 最终暂存/未暂存/未跟踪清单、diff、测试命令/退出码以归档 evidence 为准。
+
+二、材料与覆盖范围
+
+交付位置（相对源项目）：artifacts/ble-collector-handoff-20261023.zip。
+外部 SHA-256 校验值由最终交付验收报告/同目录校验清单提供，先核对再使用。
+若实际产物未生成或缺少哈希，应先向源端获取，不把本操作文档当作交付成功证据。
+
+归档使用以下目录：
+- source/：本次完整可恢复源码、当前修改与未跟踪实现、构建配置、测试、工具、文档。
+  不含 .git、构建缓存、managed_components、生成的 .agents 链接、日志、真实秘密。
+- firmware/：已校验完整镜像和匹配的调试归档，具体文件以清单为准。
+- evidence/：构建/测试与工作区证据，不能包含真实 Token、SSID 或完整设备广播日志。
+- manifest.json：文件清单、内容校验值等，按最终生成格式核对全部所列文件。
+
+源码归档包含未提交修改；普通 git archive HEAD 不足以制作本次交接载体。
+不复制 Mac .toolchains、Python 虚拟环境、managed_components 或 build 到 Windows。
+需要下载的组件由 source/dependencies.lock 和 ESP-IDF 5.5.3 在目标构建时恢复。
+镜像调试归档可以直接用于比对/现场调试，不要求为了刷机先在笔记本重新编译。
+该说法不等于已授权刷机，也不证明 Windows/设备实际运行通过。
+
+三、目标设备第一步：保护原文件并核对归档
+
+先确认复制过来的 ZIP 和外部校验值来自本次交付；保留笔记本现有项目和修改。
+推荐恢复到新的短英文路径：D:\passport\incoming\ble-collector-20261023。
+不得直接解压覆盖旧项目；目标若已存在先另选空目录，不执行 reset --hard 或 clean。
+
+PowerShell 第一条只读操作示例（替换成实际 ZIP 路径）：
+
+  Get-FileHash -Algorithm SHA256 'D:\transfer\ble-collector-handoff-20261023.zip'
+
+比对源端完整 SHA-256；不匹配停止。检查 ZIP 清单只含相对路径，无盘符、绝对路径、
+父目录跳转和符号链接，随后在空目录解包。优先运行配套校验器；
+按照 manifest.json 检查每个列出文件的 SHA-256，不能只验 ZIP 能打开或目录存在。
+
+源端 artifacts/ 还提供 verify_collector_handoff.py（与 ZIP 内 source/tools/ 同内容）。
+把它与 ZIP 和 .zip.sha256 一起复制；从可信源端核对外置哈希后，在已有 Python 中执行：
+
+  python .\verify_collector_handoff.py .\ble-collector-handoff-20261023.zip --sha256 <源端64位SHA256> --extract-to 'D:\passport\incoming\ble-collector-20261023'
+
+替换占位哈希；--extract-to 必须是尚不存在的新目录。工具先检查逐文件哈希并在
+临时目录恢复，全部成功才复制到目标；不打开串口、不安装环境、不修改旧项目。
+
+恢复后 source/ 不含 .git，所以它是源码快照，不冒充 Git checkout：
+- 可直接在 source/ 做隔离构建、测试和后续编辑；先保留原归档作为恢复基线。
+- 将来需要纳入 Git 时，另建仓库克隆并核对上面完整基线 SHA，检查已有修改为空，
+  再按清单对照恢复源码。不要覆盖旧目录或盲目 git pull；提交/推送仍须另行授权。
+- 当前目录不能用 git status 检验源码快照完整性，使用清单哈希。
+- Mac passport 启动器是工作区工具链适配，不在 Windows 直接运行。
+
+四、目标环境与最小接手验证
+
+使用已有 ESP-IDF 官方 PowerShell/Command Prompt，优先复用已安装的环境。
+若无可用环境，先读 docs/development/engineering/windows-native-handoff.txt，
+按 passport-setup 盘点并补齐 ESP-IDF 5.5.3 原生工具；不默认安装 WSL/Docker。
+不改全局 PATH、默认 Python、shell、代理或证书。普通终端找不到 idf.py 不能
+证明未安装，先找已有专用环境快捷方式。
+
+在 source/、已激活环境中执行：
+
+  idf.py --version
+  python --version
+  python -c "import sys; print(sys.executable)"
+  python -c "import serial; print(serial.__version__)"
+  python tests/test_configure_collector.py
+  python tests/test_collector_handoff.py
+
+ESP-IDF 必须输出 v5.5.3。记录每条命令的真实结果；上面 USB 单元测试使用模拟串口，
+不是设备接入测试。Python、C 主机测试、全门禁分别报告，不把部分通过当完整通过。
+项目五个 passport-* 技能源在 skills/，归档不会带生成链接；检查发现状态并在需要
+AI 开发时按 install_passport_skills.py 的既有方式安装。目标权限不支持符号链接时
+按原生交接任务书的实际发现机制处理，不谎称链接检查通过。
+
+五、需要现场开发时的 Windows 隔离构建
+
+先检查 build/windows-native 是否已存在及其来源；不删除已有目录求通过。
+若不可信，选择新的短英文构建目录并同步以下变量。PowerShell 示例：
+
+  $repo = (Get-Location).Path
+  $build = Join-Path $repo 'build\windows-native'
+  $config = Join-Path $build 'sdkconfig'
+  $defaults = Join-Path $repo 'sdkconfig.defaults'
+  $env:IDF_TARGET = 'esp32c3'
+  $env:IDF_TOOLCHAIN = 'gcc'
+  New-Item -ItemType Directory -Force -Path $build | Out-Null
+  idf.py -B $build -D "SDKCONFIG=$config" -D "SDKCONFIG_DEFAULTS=$defaults" reconfigure
+  if ($LASTEXITCODE -ne 0) { throw '配置失败，停止' }
+  cmake --build $build --parallel 2
+  if ($LASTEXITCODE -ne 0) { throw '构建失败，停止' }
+  idf.py -B $build -D "SDKCONFIG=$config" merge-bin -o "$build/FoloToy-AI-Passport-full.bin"
+  if ($LASTEXITCODE -ne 0) { throw '合并失败，停止' }
+  python tools/verify_firmware.py $build
+  if ($LASTEXITCODE -ne 0) { throw '镜像校验失败，停止' }
+  python tools/archive_firmware.py create $build
+  if ($LASTEXITCODE -ne 0) { throw '调试归档失败，停止' }
+
+记录最后输出的实际归档目录，再执行 tools/archive_firmware.py verify 实际归档目录。
+保存 BIN、匹配 ELF/MAP、bootloader、partition-table、flash_args 和 manifest。
+确认目标 ESP32-C3、8 MB Flash、无 PSRAM、USB Serial/JTAG，并核对 dependencies.lock。
+Windows 原生构建不是 Mac 完整门禁的替代；Bash/C/workflow 不兼容项应记录 NOT RUN，
+不可删测试或修改门禁隐藏它。目标未执行的命令与本次源端报告分开。
+
+六、首个未完成步骤与实机顺序
+
+1. 笔记本确认本次归档哈希、源码完整性及实际工具版本，记录接手验证。
+2. 准备独立 ai_passport 节点、设备可达 HTTPS 基址和可信 CA，不复用 Mac 凭据。
+3. 先只读识别实际设备/COM 口。若要刷机、串口打开/复位，取得针对本次镜像的授权。
+4. 按 device-acceptance.txt 执行 D01–D12，保留匹配固件 SHA-256 的脱敏证据。
+5. 根据实测修复，再重新运行受影响的主机测试、全门禁和构建；新镜像重新归档。
+
+当前待验证：Windows 环境、真实 BLE/字节序/覆盖率、Wi-Fi/BLE 共存、校时与 TLS、
+真实屏幕/字形/三键、总 RAM/栈余量、故障恢复和 2/24 小时长稳。
+D11 加密持久化未实施；RAM 临时接入不能将其记为通过。
+本机实际上限为 16 聚合槽、32 事件、300 秒 TTL、8 KiB 请求缓冲；原因见
+resource-budget.txt。不要把原任务书初值 32/64 当成此镜像实际容量。
+服务地址/CA/真实节点凭据必须走用户批准的私密渠道，不放本归档。
+
+七、接手报告模板（保存在目标日志目录，不填写秘密）
+
+目标系统/架构、恢复时间、归档 SHA-256、manifest 校验结果：
+源端代码基线及未提交快照身份、目标实际路径、保留的既有修改：
+ESP-IDF/Python/工具真实版本和路径、依赖锁是否变化：
+Source restore: PASS / FAIL / NOT RUN
+Environment: PASS / FAIL / NOT RUN
+Build: PASS / FAIL / NOT RUN
+Host tests: PASS / FAIL / NOT RUN（明确 Python/C/workflow 范围）
+Device tests: NOT RUN / PASS / FAIL（逐项 D01–D12）
+Unverified: HTTPS、设备、持久化、平台兼容等实际剩余项
+
+“材料已准备”“代码已传递”“接手已验证”“设备验收完成”是四个不同结论。
+请只报告已有证据支持的阶段；本文件不代表后三项已经完成。

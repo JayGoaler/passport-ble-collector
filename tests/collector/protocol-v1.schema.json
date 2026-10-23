@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:personal-toolbox:ble:v1",
+  "title": "蓝牙节点V1协议",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ObservationBatchV1"
+    },
+    {
+      "$ref": "#/$defs/HeartbeatV1"
+    }
+  ],
+  "$defs": {
+    "ObservationV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{3})?Z$"
+        },
+        "local_device_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "identifier_type": {
+          "enum": [
+            "corebluetooth_uuid",
+            "ble_address"
+          ]
+        },
+        "address_type": {
+          "enum": [
+            "public",
+            "random_static",
+            "random_private",
+            "unknown",
+            null
+          ]
+        },
+        "local_name": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rssi_dbm": {
+          "type": "number",
+          "minimum": -127,
+          "maximum": -1
+        },
+        "rssi_min_dbm": {
+          "type": "integer",
+          "minimum": -127,
+          "maximum": -1
+        },
+        "rssi_max_dbm": {
+          "type": "integer",
+          "minimum": -127,
+          "maximum": -1
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "window_ms": {
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 3000
+        },
+        "tx_power_dbm": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -127,
+              "maximum": 126
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "service_uuids": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "pattern": "^([0-9a-fA-F]{4}|[0-9a-fA-F]{8}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})$"
+          }
+        },
+        "manufacturer_id": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "event_id",
+        "observed_at",
+        "local_device_id",
+        "identifier_type",
+        "address_type",
+        "local_name",
+        "rssi_dbm",
+        "rssi_min_dbm",
+        "rssi_max_dbm",
+        "sample_count",
+        "window_ms",
+        "tx_power_dbm",
+        "service_uuids",
+        "manufacturer_id"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "identifier_type": {
+                "const": "corebluetooth_uuid"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "local_device_id": {
+                "pattern": "^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$"
+              },
+              "address_type": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "local_device_id": {
+                "pattern": "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"
+              },
+              "address_type": {
+                "enum": [
+                  "public",
+                  "random_static",
+                  "random_private",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ObservationBatchV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "node_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$"
+        },
+        "batch_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$"
+        },
+        "sent_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{3})?Z$"
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/$defs/ObservationV1"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "node_id",
+        "batch_id",
+        "sent_at",
+        "observations"
+      ]
+    },
+    "HeartbeatV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "node_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{3})?Z$"
+        },
+        "collector_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "scan_state": {
+          "enum": [
+            "scanning",
+            "paused",
+            "permission_denied",
+            "bluetooth_off",
+            "unavailable",
+            "error"
+          ]
+        },
+        "bluetooth_state": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "permission_state": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "last_observation_at": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(?:\\.\\d{3})?Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pending_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100000
+        },
+        "dropped_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_config_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "schema_version",
+        "node_id",
+        "observed_at",
+        "collector_version",
+        "scan_state",
+        "bluetooth_state",
+        "permission_state",
+        "last_observation_at",
+        "pending_count",
+        "dropped_count",
+        "error_code"
+      ]
+    },
+    "NodeConfigV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "node_id",
+        "scan_enabled",
+        "aggregation_window_ms",
+        "heartbeat_interval_sec",
+        "max_batch_size",
+        "config_revision",
+        "active_threshold_sec",
+        "stale_threshold_sec",
+        "retention_days",
+        "strong_signal_dbm",
+        "weak_signal_dbm"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "node_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$"
+        },
+        "scan_enabled": {
+          "type": "boolean"
+        },
+        "aggregation_window_ms": {
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 3000
+        },
+        "heartbeat_interval_sec": {
+          "const": 30
+        },
+        "max_batch_size": {
+          "const": 100
+        },
+        "config_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "active_threshold_sec": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 120
+        },
+        "stale_threshold_sec": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 3600
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30
+        },
+        "strong_signal_dbm": {
+          "type": "integer",
+          "minimum": -126,
+          "maximum": -1
+        },
+        "weak_signal_dbm": {
+          "type": "integer",
+          "minimum": -127,
+          "maximum": -2
+        }
+      }
+    }
+  }
+}

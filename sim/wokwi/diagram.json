@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "author": "Passport BLE collector simulation",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "board-esp32-c3-devkitm-1", "id": "esp", "top": 0, "left": 0,
+      "attrs": { "flashSize": "8", "serialInterface": "USB_SERIAL_JTAG" } },
+    { "type": "wokwi-ili9341", "id": "lcd", "top": -35, "left": 200, "attrs": {} },
+    { "type": "wokwi-pushbutton", "id": "up", "top": 230, "left": 10,
+      "attrs": { "color": "green", "label": "UP", "bounce": "0" } },
+    { "type": "wokwi-pushbutton", "id": "down", "top": 230, "left": 90,
+      "attrs": { "color": "blue", "label": "DOWN", "bounce": "0" } },
+    { "type": "wokwi-pushbutton", "id": "ok", "top": 230, "left": 170,
+      "attrs": { "color": "yellow", "label": "OK", "bounce": "0" } }
+  ],
+  "connections": [
+    ["esp:3V3.1", "lcd:VCC", "red", []],
+    ["esp:GND.1", "lcd:GND", "black", []],
+    ["esp:9", "lcd:MOSI", "green", []],
+    ["esp:8", "lcd:SCK", "orange", []],
+    ["esp:1", "lcd:CS", "blue", []],
+    ["esp:RX", "lcd:D/C", "purple", []],
+    ["esp:4", "up:1.l", "green", []],
+    ["esp:5", "down:1.l", "blue", []],
+    ["esp:6", "ok:1.l", "yellow", []],
+    ["esp:GND.1", "up:2.l", "black", []],
+    ["esp:GND.1", "down:2.l", "black", []],
+    ["esp:GND.1", "ok:2.l", "black", []]
+  ],
+  "dependencies": {}
+}

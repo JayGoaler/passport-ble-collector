@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = '../../build/wokwi/flasher_args.json'
+elf = '../../build/wokwi/FoloToy-AI-Passport.elf'

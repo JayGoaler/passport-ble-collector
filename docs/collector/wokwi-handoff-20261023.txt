@@ -1,0 +1,60 @@
+Wokwi 阶段笔记本交接补充（2026-10-23，Asia/Shanghai）
+本文描述发布前归档快照；最新源码以
+https://github.com/JayGoaler/passport-ble-collector 的 main 分支及提交为准。
+
+范围与状态
+  本轮按要求只验证固件运行；BLE 为合成广播，网络使用固件内置应答。
+  实际运行结果、截图审查与镜像 SHA-256 以最终 wokwi-acceptance-20261023.txt 为准。
+  没有提交、推送、刷机或传输代码；材料在源 Mac 本地，目标笔记本尚未验证。
+
+恢复载体
+  新包：artifacts/ble-collector-wokwi-handoff-20261023.zip
+  对应外置校验：同名 .zip.sha256。文件中不包含 Wokwi CLI Token。
+  旧 ble-collector-handoff-20261023.zip 是 Wokwi 接入前快照，继续保留。
+  新包包含当前未提交源码、原任务书、真实固件及独立仿真产物/测试证据。
+  source/ 是当前完整源码快照，不含 .git、工具链、缓存和生产配置。
+  firmware/ 是正常 Passport 固件；evidence/logs/simulation-only/ 只供模拟器，禁止刷机。
+
+代码基线
+  项目：projects/ble-collector；分支 feature/ble-collector。
+  HEAD：79bdc9a78d3eb7dae0b66862f1b8113ab0dae10e；改动全部未提交。
+  git pull 不会取得这些内容；先复制归档到笔记本，校验后恢复到新的空目录，
+  不覆盖笔记本现有工作。通用恢复步骤沿用 laptop-handoff-20261023.txt。
+
+目标设备第一步
+  python tools/verify_collector_handoff.py <交接ZIP路径> --sha256 <外置校验文件中的SHA256>
+  使用归档外附带的同名校验工具，或源项目 tools/verify_collector_handoff.py。
+  校验通过后加 --extract-to <尚不存在的新目录> 恢复；该工具会先校验完整清单。
+
+Wokwi 环境
+  ESP-IDF 5.5.3；源 Mac 使用隔离工具链与 Wokwi CLI v0.29.0。
+  源 Mac 可用 python tools/wokwi.py build / lint / smoke / flow；参数见 sim/wokwi/README.txt。
+  WOKWI_CLI_TOKEN 在目标机器单独设置，或 --token-file 指向目标机本地文件；
+  不把 Token 复制进源码、归档或日志。CLI 只发送仿真镜像和合成数据。
+  macOS 的 passport 构建入口不是 Windows 安装脚本；Windows 原生构建环境
+  仍按既有 windows-native-handoff.txt 核对，当前未在 Windows 运行 Wokwi。
+
+预构建仿真材料
+  归档内 evidence/logs/simulation-only/ 保存独立 build/wokwi 文件及清单，
+  对应运行结果见最终验收报告。恢复到解包后的 source/build/wokwi/：
+  1. 将 wokwi-sdkconfig.txt 复制并重命名为 sdkconfig。打包器排除所有同名
+     sdkconfig，因此归档使用该别名；未重命名将无法通过仿真产物摘要校验。
+  2. 其余文件保持原有名称和相对子路径，包括 bootloader/ 和 partition_table/。
+  3. 从 source/ 运行 tools/wokwi.py smoke 或 flow，使用目标机 --cli、
+     --token-file 和新的 --output。工具核对 simulation-manifest.json 中的源码及
+     产物 SHA-256；摘要不匹配时先查明原因，再按目标环境重新 build，不跳过校验。
+  跨机 CLI、权限与账户配额须在目标机实际验证；源 Mac 的通过不等于笔记本通过。
+
+场景与计时
+  smoke 保留启动、空设备、诊断、菜单和 USB 窗口五张图（01 至 05）。
+  flow 先配置，再覆盖采集、切换设备、暂停和恢复，共八张图（01、05 至 11）；
+  不要求 flow 再生成 02 至 04，空状态由 smoke 覆盖。是否通过以最终报告为准。
+  心跳周期仍是 30 秒，没有缩短；flow 等待第二次心跳并核对控制器 ACK。
+  仿真使用 80 MHz CPU、100 Hz RTOS tick，正常固件使用 160 MHz、1000 Hz。
+  固定合成 USB 配置和从 2026-10-23 开始的模拟 UTC 不证明真实联网或校时。
+  本轮不依赖后端，不包含 Wokwi CLI Token，也未进行目标笔记本验证或刷机。
+
+后续实机验收
+  待设备可用并另获授权后，沿用 device-acceptance.txt，使用正常固件目录中的镜像。
+  实机 BLE、ST7789P3、ADC 按键、电池、物理 USB、Wi-Fi/TLS、无线共存与长期运行
+  都未由本轮仿真验收；仿真频率、固定 UTC 与内置应答不代表实际性能。

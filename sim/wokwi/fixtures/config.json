@@ -1,0 +1,8 @@
+{
+  "ssid": "Wokwi-GUEST",
+  "password": "",
+  "base_url": "https://fixture.wokwi.invalid",
+  "node_id": "Wokwi",
+  "token": "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+  "ca": "-----BEGIN CERTIFICATE-----\nSYNTHETIC-NOT-A-CERT\n-----END CERTIFICATE-----\n"
+}

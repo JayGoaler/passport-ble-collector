@@ -1,0 +1,8 @@
+{
+  "ssid": "",
+  "password": "",
+  "base_url": "https://collector.example.invalid",
+  "node_id": "passport-ble-01",
+  "token": "",
+  "ca": ""
+}

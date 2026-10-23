@@ -1,0 +1,19 @@
+采集器中文字体
+
+来源：项目锁定的 LVGL 9.5.0 scripts/built_in_font/SourceHanSansSC-Normal.otf。
+授权：SIL Open Font License 1.1，完整文本在 SourceHanSansSC-LICENSE.txt。
+输入 SHA-256：collector-font-source.sha256。
+输出：collector_font_16.c，16 px、4 bpp、不压缩、无 kerning；固定界面文案及 ASCII。
+中文清单：collector-symbols.txt，自动提取 collector_ui.c 和 collector_controller.c 的字符串。
+
+重新生成（开发工具，不是固件运行依赖）：
+  npm install --prefix /tmp/passport-font-tools --no-audit --no-fund --ignore-scripts lv_font_conv@1.5.3
+  python3 tools/generate_collector_font.py --converter /tmp/passport-font-tools/node_modules/.bin/lv_font_conv
+Windows 可将临时目录替换为本地目录，并通过 --converter 指定 lv_font_conv.cmd。
+若本地尚未获取 LVGL，可先运行固件构建下载锁定依赖，或显式指定 --lvgl-root。
+
+编译：main/CMakeLists.txt 纳入 assets/fonts/collector_font_16.c。
+绑定：collector_ui.c 为全部标签显式使用应用字体，fallback 为 Montserrat 14。
+动态广播名：不属于固定字库的字符显示为 [?]；不更改上传事件的原始广播名。
+主机验收：python3 tools/check_collector_ui.py，使用真实 LVGL 字形查询和布局 API。
+边界：主机检查不能证明 LCD 面板显示、背光、三键电气行为和设备刷新响应正常；仍需实机验收。

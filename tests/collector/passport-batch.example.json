@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "node_id": "example-passport",
+  "batch_id": "example-batch",
+  "sent_at": "2026-10-22T10:00:00.000Z",
+  "observations": [
+    {
+      "event_id": "example-event",
+      "observed_at": "2026-10-22T10:00:00.000Z",
+      "local_device_id": "C0:FF:EE:00:00:01",
+      "identifier_type": "ble_address",
+      "address_type": "random_private",
+      "local_name": null,
+      "rssi_dbm": -58.5,
+      "rssi_min_dbm": -63,
+      "rssi_max_dbm": -54,
+      "sample_count": 4,
+      "window_ms": 2000,
+      "tx_power_dbm": null,
+      "service_uuids": [],
+      "manufacturer_id": null
+    }
+  ]
+}
